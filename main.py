@@ -30,10 +30,18 @@ while True:
         # print(rom)
         temp = ds_sensor.read_temp(rom)
 
-    lcd.putstr("Temp: {:2.3f} C\n".format(temp))
+    lcd.putstr("Temp: {:2.3f} C  ".format(temp))
+
+    for i in range(16):
+        if i % 2:
+            lcd.putchar("_")
+        else:
+            lcd.putchar("-")
+        sleep(0.25)
+
     # lcd.blink_cursor_on()
     # lcd.backlight_off()
-    sleep(5)
+    # sleep(5)
     # lcd.backlight_on()
     # lcd.putstr("Second line")
     # lcd.hide_cursor()
