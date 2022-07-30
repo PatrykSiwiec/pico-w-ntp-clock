@@ -5,6 +5,9 @@ import onewire
 import machine
 import ds18x20
 import time
+import config
+
+print("WiFi SSID: {}".format(config.WIFI_SSID))
 
 # LCD
 i2c = I2C(0, sda=Pin(0), scl=Pin(1), freq=400000)
@@ -17,32 +20,27 @@ print("I2C address: {}".format(I2C_ADDR))
 ds_pin = machine.Pin(17)
 ds_sensor = ds18x20.DS18X20(onewire.OneWire(ds_pin))
 roms = ds_sensor.scan()
-print('Found DS devices: ', roms)
+print("Found ({}) DS devices: ".format(len(roms)), roms)
+
+lcd.clear()
+lcd.putstr("Temp: 00.000 C")
 
 while True:
 
     ds_sensor.convert_temp()
     time.sleep_ms(750)
-    lcd.clear()
-    
-    temp = None
-    for rom in roms:
-        # print(rom)
-        temp = ds_sensor.read_temp(rom)
 
-    lcd.putstr("Temp: {:2.3f} C  ".format(temp))
+    temp = ds_sensor.read_temp(roms[0])
 
-    for i in range(16):
-        if i % 2:
-            lcd.putchar("_")
-        else:
-            lcd.putchar("-")
-        sleep(0.25)
+    # lcd.clear()
+    lcd.move_to(6, 0)
+    lcd.putstr("{:2.3f}".format(temp))
 
-    # lcd.blink_cursor_on()
-    # lcd.backlight_off()
-    # sleep(5)
-    # lcd.backlight_on()
-    # lcd.putstr("Second line")
-    # lcd.hide_cursor()
-    # sleep(2)
+    # for i in range(16):
+    #     if i % 2:
+    #         lcd.putchar("_")
+    #     else:
+    #         lcd.putchar("-")
+    #     sleep(0.25)
+
+    sleep(2)
