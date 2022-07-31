@@ -9,8 +9,16 @@ import config
 import network
 import socket
 import struct
+import _thread
 
 print("WiFi SSID: {}".format(config.WIFI_SSID))
+
+# led_external = Pin(15, machine.Pin.OUT)
+# led_external.toggle()
+
+# global vars
+TEMP = 0
+LAST_TEMP_SYNC = 0
 
 # LCD
 i2c = I2C(0, sda=Pin(0), scl=Pin(1), freq=400000)
@@ -53,19 +61,20 @@ def connect_to_wifi():
         if wlan.status() < 0 or wlan.status() >= 3:
             break
         max_wait -= 1
-        print('waiting for connection...')
+        print("Waiting for connection...")
         lcd.clear()
         lcd.putstr("Waiting for WiFi connection...")
         time.sleep(1)
 
     if wlan.status() != 3:
-        raise RuntimeError('network connection failed')
+        raise RuntimeError("Network connection failed!")
     else:
-        print('connected')
+        print("WiFi connected!")
         lcd.clear()
-        lcd.putstr("WiFi connected!\n")
+        lcd.putstr("WiFi connected!")
         status = wlan.ifconfig()
-        print( 'ip = ' + status[0] )
+        print("IP = {}".format(status[0]))
+        lcd.move_to(0, 1)
         lcd.putstr(status[0])
 
 def disconnect_from_wifi():
@@ -110,18 +119,39 @@ print("Found ({}) DS devices: ".format(len(roms)), roms)
 lcd.clear()
 lcd.putstr("Temp: 00.000{}C".format(chr(0)))
 
-while True:
+baton = _thread.allocate_lock()
 
+def get_temperature_thread():
+    baton.acquire()
     ds_sensor.convert_temp()
     time.sleep_ms(750)
 
-    temp = ds_sensor.read_temp(roms[0])
+    global TEMP, LAST_TEMP_SYNC
+    TEMP = ds_sensor.read_temp(roms[0])
+    LAST_TEMP_SYNC = time.time()
+    baton.release()
 
-    # lcd.clear()
-    lcd.move_to(6, 0)
-    lcd.putstr("{:2.3f}".format(temp))
+def main():
+    while True:
 
-    lcd.move_to(0, 1)
-    lcd.putstr(datetime_str(current_time()))
+        if time.time() - LAST_TEMP_SYNC > 5 and not baton.locked():
+            _thread.start_new_thread(get_temperature_thread, ())
 
-    # sleep(2)
+        lcd.move_to(6, 0)
+        lcd.putstr("{:2.3f}".format(TEMP))
+
+        lcd.move_to(0, 1)
+        lcd.putstr(datetime_str(current_time()))
+
+        # if time.localtime()[5] > 30:
+        #     led_external.on()
+        # else:
+        #     led_external.off()
+
+        sleep(0.2)
+
+# run main loop
+try:
+    main()
+except KeyboardInterrupt:
+    print("KeyboardInterrupt")
