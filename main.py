@@ -13,12 +13,14 @@ import _thread
 
 print("WiFi SSID: {}".format(config.WIFI_SSID))
 
-# led_external = Pin(15, machine.Pin.OUT)
+led_external = Pin(15, Pin.OUT)
+sensor_pir = Pin(28, Pin.IN, Pin.PULL_DOWN)
 # led_external.toggle()
 
 # global vars
 TEMP = 0
 LAST_TEMP_SYNC = 0
+LAST_PIR_DETECTION = time.time()
 
 # LCD
 i2c = I2C(0, sda=Pin(0), scl=Pin(1), freq=400000)
@@ -132,6 +134,7 @@ def get_temperature_thread():
     baton.release()
 
 def main():
+    global LAST_PIR_DETECTION
     while True:
 
         if time.time() - LAST_TEMP_SYNC > 5 and not baton.locked():
@@ -143,10 +146,15 @@ def main():
         lcd.move_to(0, 1)
         lcd.putstr(datetime_str(current_time()))
 
-        # if time.localtime()[5] > 30:
-        #     led_external.on()
-        # else:
-        #     led_external.off()
+        # global LAST_PIR_DETECTION
+        time_diff = time.time() - LAST_PIR_DETECTION
+        # print("PIR value: {}, time diff: {}".format(sensor_pir.value(), time_diff))
+        
+        if sensor_pir.value() > 0 and time_diff > 1:
+            led_external.on()
+            LAST_PIR_DETECTION = time.time()
+        elif sensor_pir.value() < 1 and time_diff > 60:
+            led_external.off()
 
         sleep(0.2)
 
@@ -155,3 +163,4 @@ try:
     main()
 except KeyboardInterrupt:
     print("KeyboardInterrupt")
+    led_external.off()
