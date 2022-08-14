@@ -10,6 +10,26 @@ import network
 import socket
 import struct
 import _thread
+import neopixel
+
+
+
+# for i in range(255):
+#     np[7] = (i, 0, 0)
+#     np.write()
+#     sleep(0.05)
+
+# from random import seed
+# from random import randint
+# # seed(1)
+
+# for i in range(LEDS_COUNT):
+#     # np[i] = (120, 153, 23)
+#     np[i] = (1, 0, 0)
+#     # np[i] = (randint(0, 255), randint(0, 255), randint(0, 255))
+#     np.write()
+#     sleep(0.5)
+
 
 print("WiFi SSID: {}".format(config.WIFI_SSID))
 
@@ -100,6 +120,30 @@ def current_time():
     time_seconds = time.time() + 7200 # 2h (7200s)
     return time.localtime(time_seconds)
 
+# clear WS2812 LEDs
+def leds_clear():
+    for i in range(LEDS_COUNT):
+        np[i] = (0, 0, 0)
+    np.write()
+
+def leds_turn_on():
+    np[0] = (1, 0, 0)
+    np[1] = (0, 1, 0)
+    np[2] = (0, 0, 1)
+    np[3] = (1, 1, 1)
+    np[4] = (120, 153, 23)
+    np[5] = (0, 0, 128)
+    np[6] = (0, 128, 0)
+    np[7] = (128, 0, 0)
+
+    np.write()
+
+# init WS2812 LEDs
+LEDS_COUNT = 8
+np = neopixel.NeoPixel(Pin(4), LEDS_COUNT)
+# np.brightness = 0.1
+leds_clear()
+
 # sync time from NTP server
 connect_to_wifi()
 sleep(0.5)
@@ -146,15 +190,14 @@ def main():
         lcd.move_to(0, 1)
         lcd.putstr(datetime_str(current_time()))
 
-        # global LAST_PIR_DETECTION
         time_diff = time.time() - LAST_PIR_DETECTION
         # print("PIR value: {}, time diff: {}".format(sensor_pir.value(), time_diff))
         
         if sensor_pir.value() > 0 and time_diff > 1:
-            led_external.on()
+            leds_turn_on()
             LAST_PIR_DETECTION = time.time()
         elif sensor_pir.value() < 1 and time_diff > 60:
-            led_external.off()
+            leds_clear()
 
         sleep(0.2)
 
@@ -164,3 +207,5 @@ try:
 except KeyboardInterrupt:
     print("KeyboardInterrupt")
     led_external.off()
+
+    leds_clear()
