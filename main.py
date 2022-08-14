@@ -11,25 +11,7 @@ import socket
 import struct
 import _thread
 import neopixel
-
-
-
-# for i in range(255):
-#     np[7] = (i, 0, 0)
-#     np.write()
-#     sleep(0.05)
-
-# from random import seed
-# from random import randint
-# # seed(1)
-
-# for i in range(LEDS_COUNT):
-#     # np[i] = (120, 153, 23)
-#     np[i] = (1, 0, 0)
-#     # np[i] = (randint(0, 255), randint(0, 255), randint(0, 255))
-#     np.write()
-#     sleep(0.5)
-
+import dht
 
 print("WiFi SSID: {}".format(config.WIFI_SSID))
 
@@ -39,6 +21,7 @@ sensor_pir = Pin(28, Pin.IN, Pin.PULL_DOWN)
 
 # global vars
 TEMP = 0
+HUM = 0
 LAST_TEMP_SYNC = 0
 LAST_PIR_DETECTION = time.time()
 
@@ -156,36 +139,64 @@ print("Time after NTP sync [UTC+2]: {}".format(time.localtime(time_seconds)))
 
 disconnect_from_wifi()
 
-# temperature sensor
-ds_pin = machine.Pin(17)
-ds_sensor = ds18x20.DS18X20(onewire.OneWire(ds_pin))
-roms = ds_sensor.scan()
-print("Found ({}) DS devices: ".format(len(roms)), roms)
+## temperature sensor
+# ds_pin = machine.Pin(17)
+# ds_sensor = ds18x20.DS18X20(onewire.OneWire(ds_pin))
+# roms = ds_sensor.scan()
+# print("Found ({}) DS devices: ".format(len(roms)), roms)
 
 lcd.clear()
-lcd.putstr("Temp: 00.000{}C".format(chr(0)))
+lcd.putstr("T: 00.0{}C H: 00%".format(chr(0)))
+
+# DHT22 temperature & humidity sensor
+dht22 = dht.DHT22(Pin(2))
 
 baton = _thread.allocate_lock()
 
-def get_temperature_thread():
-    baton.acquire()
-    ds_sensor.convert_temp()
-    time.sleep_ms(750)
+# def get_temperature_thread():
+#     baton.acquire()
+#     ds_sensor.convert_temp()
+#     time.sleep_ms(750)
 
-    global TEMP, LAST_TEMP_SYNC
-    TEMP = ds_sensor.read_temp(roms[0])
+#     global TEMP, LAST_TEMP_SYNC
+#     TEMP = ds_sensor.read_temp(roms[0])
+#     LAST_TEMP_SYNC = time.time()
+#     baton.release()
+
+def get_dht_data_thread():
+    baton.acquire()
+
+    global TEMP, HUM, LAST_TEMP_SYNC
+    if LAST_TEMP_SYNC == 0: #
+        # should wait at least 2s before first read
+        LAST_TEMP_SYNC = time.time()
+        baton.release()
+        return
+
+    try:
+        dht22.measure()
+        TEMP = dht22.temperature()
+        HUM = dht22.humidity()
+        print("[{}] T: {} C, H: {}%".format(datetime_str(current_time()), TEMP, HUM))
+    except Exception as ex:
+        print(ex)
+
     LAST_TEMP_SYNC = time.time()
+    
     baton.release()
 
 def main():
     global LAST_PIR_DETECTION
     while True:
 
-        if time.time() - LAST_TEMP_SYNC > 5 and not baton.locked():
-            _thread.start_new_thread(get_temperature_thread, ())
+        if time.time() - LAST_TEMP_SYNC >= 5 and not baton.locked():
+            _thread.start_new_thread(get_dht_data_thread, ())
 
-        lcd.move_to(6, 0)
-        lcd.putstr("{:2.3f}".format(TEMP))
+        lcd.move_to(3, 0)
+        lcd.putstr("{:2.1f}".format(TEMP))
+        
+        lcd.move_to(13, 0)
+        lcd.putstr("{:2.0f}".format(HUM))
 
         lcd.move_to(0, 1)
         lcd.putstr(datetime_str(current_time()))
